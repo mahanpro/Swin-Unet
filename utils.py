@@ -3,6 +3,7 @@ import torch
 from medpy import metric
 from scipy.ndimage import zoom
 import torch.nn as nn
+from timm.layers.create_conv2d import create_conv2d
 import SimpleITK as sitk
 
 
@@ -19,12 +20,12 @@ class DiceLoss(nn.Module):
         output_tensor = torch.cat(tensor_list, dim=1)
         return output_tensor.float()
 
-    def _dice_loss(self, score, target):
-        target = target.float()
+    def _dice_loss(self, pred, gt):
+        gt = gt.float()
         smooth = 1e-5
-        intersect = torch.sum(score * target)
-        y_sum = torch.sum(target * target)
-        z_sum = torch.sum(score * score)
+        intersect = torch.sum(pred * gt)
+        y_sum = torch.sum(gt * gt)
+        z_sum = torch.sum(pred * pred)
         loss = (2 * intersect + smooth) / (z_sum + y_sum + smooth)
         loss = 1 - loss
         return loss
@@ -32,6 +33,7 @@ class DiceLoss(nn.Module):
     def forward(self, inputs, target, weight=None, softmax=False):
         if softmax:
             inputs = torch.softmax(inputs, dim=1)
+            inputs = inputs.unsqueeze(2)
         target = self._one_hot_encoder(target)
         if weight is None:
             weight = [1] * self.n_classes
@@ -100,3 +102,58 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
         sitk.WriteImage(img_itk, test_save_path + '/'+ case + "_img.nii.gz")
         sitk.WriteImage(lab_itk, test_save_path + '/'+ case + "_gt.nii.gz")
     return metric_list
+
+class ConvBnAct2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, padding='', bias=False,
+                 norm_layer=nn.BatchNorm2d, act_layer=None):
+        super(ConvBnAct2d, self).__init__()
+        self.conv = create_conv2d(
+            in_channels, out_channels, kernel_size, stride=stride, dilation=dilation, padding=padding, bias=bias)
+        self.bn = None if norm_layer is None else norm_layer(out_channels)
+        self.act = None if act_layer is None else act_layer(inplace=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.act is not None:
+            x = self.act(x)
+        return x
+
+class ResampleFeatureMap(nn.Sequential):
+    def __init__(
+            self, in_channels, out_channels, reduction_ratio=1., pad_type='', downsample=None, upsample=None,
+            norm_layer=nn.BatchNorm2d, apply_bn=False, conv_after_downsample=False, redundant_bias=False):
+        super(ResampleFeatureMap, self).__init__()
+        downsample = downsample or 'max'
+        upsample = upsample or 'nearest'
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.reduction_ratio = reduction_ratio
+        self.conv_after_downsample = conv_after_downsample
+
+        conv = None
+        if in_channels != out_channels:
+            conv = ConvBnAct2d(
+                in_channels, out_channels, kernel_size=1, padding=pad_type,
+                norm_layer=norm_layer if apply_bn else None,
+                bias=not apply_bn or redundant_bias, act_layer=None)
+
+        if reduction_ratio > 1:
+            if conv is not None and not self.conv_after_downsample:
+                self.add_module('conv', conv)
+            if downsample in ('max', 'avg'):
+                stride_size = int(reduction_ratio)
+                downsample = create_pool2d(
+                     downsample, kernel_size=stride_size + 1, stride=stride_size, padding=pad_type)
+            else:
+                downsample = Interpolate2d(scale_factor=1./reduction_ratio, mode=downsample)
+            self.add_module('downsample', downsample)
+            if conv is not None and self.conv_after_downsample:
+                self.add_module('conv', conv)
+        else:
+            if conv is not None:
+                self.add_module('conv', conv)
+            if reduction_ratio < 1:
+                scale = int(1 // reduction_ratio)
+                self.add_module('upsample', Interpolate2d(scale_factor=scale, mode=upsample))
