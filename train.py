@@ -22,9 +22,9 @@ parser.add_argument('--num_classes', type=int,
                     default=2, help='output channel of network')
 parser.add_argument('--output_dir', type=str, help='output dir')                   
 parser.add_argument('--max_iterations', type=int,
-                    default=30000, help='maximum epoch number to train')
+                    default=200000, help='maximum epoch number to train')
 parser.add_argument('--max_epochs', type=int,
-                    default=150, help='maximum epoch number to train')
+                    default=10, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int,
                     default=4, help='batch_size per gpu')
 parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
@@ -37,7 +37,7 @@ parser.add_argument('--img_size', type=int,
 parser.add_argument('--seed', type=int,
                     default=1234, help='random seed')
 parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
-parser.add_argument('data_aug' , action='store_true', help='enable data augmentation or not')
+parser.add_argument('--data_aug' , help='enable data augmentation or not')
 parser.add_argument(
         "--opts",
         help="Modify config options by adding 'KEY VALUE' pairs. ",

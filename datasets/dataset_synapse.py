@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from scipy import ndimage
 from scipy.ndimage.interpolation import zoom
+from PIL import Image
 from torch.utils.data import Dataset
 
 
@@ -24,56 +25,45 @@ def random_rotate(image, label):
     label = ndimage.rotate(label, angle, order=0, reshape=False)
     return image, label
 
-
-class RandomGenerator(object):
-    def __init__(self, output_size):
-        self.output_size = output_size
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        if random.random() > 0.5:
-            image, label = random_rot_flip(image, label)
-        elif random.random() > 0.5:
-            image, label = random_rotate(image, label)
-        x, y = image.shape
-        if x != self.output_size[0] or y != self.output_size[1]:
-            image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)  # why not 3?
-            label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
-        image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
-        label = torch.from_numpy(label.astype(np.float32))
-        sample = {'image': image, 'label': label.long()}
-        return sample
-
-
 class Synapse_dataset(Dataset):
-    def __init__(self, base_dir, label_dir, list_dir, split, transform=None):
+    def __init__(self, indices, base_dir, label_dir, list_dir, split, transform=None):
         self.transform = transform  # using transform in torch!
         self.split = split
-        self.sample_list = open(os.path.join(list_dir, self.split+'.txt')).readlines()
+        self.indices = indices
+        self.sample_list = open(os.path.join(list_dir +'/train.txt')).readlines()
         self.data_dir = base_dir
         self.label_dir = label_dir
+        self.cnt = 0
 
     def __len__(self):
         return len(self.sample_list)
 
     def __getitem__(self, idx):
+        # idx = self.indices[idx]
         if self.split == "train":
+            self.cnt+=1
             slice_name = self.sample_list[idx].strip('\n')
-            data_path = os.path.join(self.data_dir, slice_name+'.npz')
-            label_path = os.path.join(self.label_dir, slice_name+'.npz')
+            print(slice_name)
+            data_path = os.path.join(self.data_dir, slice_name)
+            label_path = os.path.join(self.label_dir, slice_name)
             image = np.load(data_path)
             label = np.load(label_path)
             image = image['arr_0']
             label = label['arr_0']
-        else:
-            vol_name = self.sample_list[idx].strip('\n')
-            filepath = self.data_dir + "/{}.npy.h5".format(vol_name)
-            data = h5py.File(filepath)
-            image, label = data['image'][:], data['label'][:]
+        elif self.split == "validation":
+            slice_name = self.sample_list[idx].strip('\n')
+            data_path = os.path.join(self.data_dir, slice_name)
+            label_path = os.path.join(self.label_dir, slice_name)
+            image = np.load(data_path)
+            label = np.load(label_path)
+            image = image['arr_0']
+            label = label['arr_0']
+        
+        if self.split == "train" and self.transform:
+            image = self.transform(Image.fromarray(image, mode='F'))
+            label = self.transform(Image.fromarray(label, mode='F'))
+        # if self.transform:
+        # image = self.transform(image)
+        # label = self.transform(label)
 
-        if self.transform:
-
-            image = self.transform(image)
-            label = self.transform(label)
-        return image, label
+        return image, label, slice_name, self.cnt

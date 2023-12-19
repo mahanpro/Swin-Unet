@@ -99,21 +99,21 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(args.seed)
 
     dataset_config = {
-        'Synapse': {
+        'TCIA': {
             'Dataset': Synapse_dataset,
             'volume_path': args.volume_path,
             'list_dir': './lists/lists_Synapse',
-            'num_classes': 9,
+            'num_classes': 2,
             'z_spacing': 1,
         },
     }
     dataset_name = args.dataset
-    args.num_classes = dataset_config[dataset_name]['num_classes']
-    args.volume_path = dataset_config[dataset_name]['volume_path']
-    args.Dataset = dataset_config[dataset_name]['Dataset']
-    args.list_dir = dataset_config[dataset_name]['list_dir']
-    args.z_spacing = dataset_config[dataset_name]['z_spacing']
-    args.is_pretrain = True
+    args.num_classes  = dataset_config[dataset_name]['num_classes']
+    args.volume_path  = dataset_config[dataset_name]['volume_path']
+    args.Dataset      = dataset_config[dataset_name]['Dataset']
+    args.list_dir     = dataset_config[dataset_name]['list_dir']
+    args.z_spacing    = dataset_config[dataset_name]['z_spacing']
+    args.is_pretrain  = True
 
     net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
 
