@@ -84,7 +84,7 @@ if __name__ == "__main__":
             'root_path': args.root_path,
             'label_path': args.label_path,
             'list_dir': './lists/lists_Synapse',
-            'num_classes': 2,
+            'num_classes': args.num_classes,
         },
     }
 

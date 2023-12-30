@@ -21,7 +21,7 @@ from .swin_transformer_unet_skip_expand_decoder_sys import SwinTransformerSys
 logger = logging.getLogger(__name__)
 
 class SwinUnet(nn.Module):
-    def __init__(self, config, img_size=400, num_classes=2, zero_head=False, vis=False):
+    def __init__(self, config, img_size=400, num_classes=1, zero_head=False, vis=False):
         super(SwinUnet, self).__init__()
         self.num_classes = num_classes
         self.zero_head = zero_head
@@ -64,7 +64,7 @@ class SwinUnet(nn.Module):
                     if "output" in k:
                         print("delete key:{}".format(k))
                         del pretrained_dict[k]
-                msg = self.swin_unet.load_state_dict(pretrained_dict,strict=False)
+                msg = self.swin_unet.load_state_dict(pretrained_dict, strict=False)
                 # print(msg)
                 return
             pretrained_dict = pretrained_dict['model']

@@ -38,10 +38,9 @@ def trainer_synapse(args, model, output_dir):
     logging.basicConfig(filename=output_dir + "/log_without_stopping_criteria_1st_try.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.info(str(args))
-    base_lr = args.base_lr
+    base_lr     = args.base_lr
     num_classes = args.num_classes
-    batch_size = args.batch_size * args.n_gpu
+    batch_size  = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
     if args.data_aug == '1':
         transform = transforms.Compose([
@@ -57,7 +56,7 @@ def trainer_synapse(args, model, output_dir):
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
 
-    ce_loss = CrossEntropyLoss()
+    ce_loss   = CrossEntropyLoss()
     dice_loss = DiceLoss(num_classes)
     
     for fold, (train_index, val_index) in enumerate(kf.split(range(len(os.listdir(args.root_path))))):
@@ -87,27 +86,30 @@ def trainer_synapse(args, model, output_dir):
             for _, sampled_batch in enumerate(trainloader):
                 iter_num_train += 1
                 image_batch, label_batch = sampled_batch[0], sampled_batch[1]
-                print("cnt is ===========================================================", sampled_batch[-1])
-                logging.info('number of non_zero elements in label_batch[0, 0, :, :] = %d' % (torch.count_nonzero(label_batch[0, 0, :, :])))
-                logging.info('number of non_zero elements in label_batch[1, 0, :, :] = %d' % (torch.count_nonzero(label_batch[1, 0, :, :])))
-                logging.info('number of non_zero elements in label_batch[2, 0, :, :] = %d' % (torch.count_nonzero(label_batch[2, 0, :, :])))
-                logging.info('number of non_zero elements in label_batch[3, 0, :, :] = %d' % (torch.count_nonzero(label_batch[3, 0, :, :])))
                 image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
                 image_batch = image_batch.to(torch.float32)
                 label_batch = label_batch.to(torch.float32)
                 image_batch = image_batch.resize_(batch_size, 448, 448)
                 label_batch = label_batch.resize_(batch_size, 448, 448)
-                for j in range(batch_size):
-                    image_batch[j, :, :] = image_batch[j, :, :]/image_batch.view(image_batch.size(0), -1).max(dim=-1).values[j]
+                # for j in range(batch_size):
+                #     image_batch[j, :, :] = image_batch[j, :, :]/image_batch.view(image_batch.size(0), -1).max(dim=-1).values[j]
                 image_batch = image_batch.unsqueeze(1)
                 label_batch = label_batch.unsqueeze(1)
                 optimizer.zero_grad()
                 outputs = model(image_batch)
-                loss_ce = ce_loss(outputs, label_batch[:, 0, :, :].long())
+                # print("outputs shape is: ", outputs.shape)
+                # print("minimum value of outputs is: ", torch.min(outputs))
+                # print("maximum value of outputs is: ", torch.max(outputs))
+                loss_ce   = ce_loss(outputs, label_batch[:, 0, :, :].long())
                 loss_dice = dice_loss(outputs, label_batch, softmax=True)
                 loss = 0.4 * loss_ce + 0.6 * loss_dice
                 # print("TRAIN Dice loss is: ", loss_dice)
                 # print("TRAIN CE Loss is: ", loss_ce)
+                if iter_num_train % 5 == 0 :
+                    print("iteration number is: ", iter_num_train)
+                    print("Loss is: ", loss)
+                    print("TRAIN Dice loss is: ", loss_dice)
+                    print("TRAIN CE Loss is: ", loss_ce)
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
@@ -137,7 +139,6 @@ def trainer_synapse(args, model, output_dir):
             # Calculate average training loss for the epoch
             train_loss = running_loss / len(trainloader)
             train_losses.append(train_loss)
-
             # Validation loop
             model.eval()
             val_running_loss = 0.0
@@ -156,7 +157,7 @@ def trainer_synapse(args, model, output_dir):
                     label_batch = label_batch.unsqueeze(1)
 
                     outputs = model(image_batch)
-                    loss_ce = ce_loss(outputs, label_batch[:].long())
+                    loss_ce = ce_loss(outputs, label_batch[:, 0, :, :].long())
                     loss_dice = dice_loss(outputs, label_batch, softmax=True)
                     loss = 0.4 * loss_ce + 0.6 * loss_dice
                     print("VALIDATION Dice loss is: ", loss_dice)

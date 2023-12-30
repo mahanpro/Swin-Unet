@@ -6,6 +6,7 @@ import torch
 from scipy import ndimage
 from scipy.ndimage.interpolation import zoom
 from PIL import Image
+import logging
 from torch.utils.data import Dataset
 
 
@@ -31,9 +32,9 @@ class Synapse_dataset(Dataset):
         self.split = split
         self.indices = indices
         self.sample_list = open(os.path.join(list_dir +'/train.txt')).readlines()
+        # print(self.sample_list)
         self.data_dir = base_dir
         self.label_dir = label_dir
-        self.cnt = 0
 
     def __len__(self):
         return len(self.sample_list)
@@ -41,10 +42,8 @@ class Synapse_dataset(Dataset):
     def __getitem__(self, idx):
         # idx = self.indices[idx]
         if self.split == "train":
-            self.cnt+=1
             slice_name = self.sample_list[idx].strip('\n')
-            print(slice_name)
-            data_path = os.path.join(self.data_dir, slice_name)
+            data_path  = os.path.join(self.data_dir, slice_name)
             label_path = os.path.join(self.label_dir, slice_name)
             image = np.load(data_path)
             label = np.load(label_path)
@@ -52,7 +51,7 @@ class Synapse_dataset(Dataset):
             label = label['arr_0']
         elif self.split == "validation":
             slice_name = self.sample_list[idx].strip('\n')
-            data_path = os.path.join(self.data_dir, slice_name)
+            data_path  = os.path.join(self.data_dir, slice_name)
             label_path = os.path.join(self.label_dir, slice_name)
             image = np.load(data_path)
             label = np.load(label_path)
@@ -60,10 +59,10 @@ class Synapse_dataset(Dataset):
             label = label['arr_0']
         
         if self.split == "train" and self.transform:
-            image = self.transform(Image.fromarray(image, mode='F'))
-            label = self.transform(Image.fromarray(label, mode='F'))
+            image = self.transform(image)
+            label = self.transform(label)
         # if self.transform:
         # image = self.transform(image)
         # label = self.transform(label)
 
-        return image, label, slice_name, self.cnt
+        return image, label, slice_name
